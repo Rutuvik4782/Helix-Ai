@@ -1,0 +1,25 @@
+{
+  "weighted_ranking": {
+    "Helix AI": 8.385,
+    "OpenAI Codex/ChatGPT": 7.755000000000002,
+    "GitHub Copilot": 7.69,
+    "Claude Code": 7.965,
+    "Cursor": 7.580000000000001
+  },
+  "legacy_confidence_index": {
+    "Helix AI": 9.27,
+    "OpenAI Codex/ChatGPT": 7.08,
+    "GitHub Copilot": 7.16,
+    "Claude Code": 7.470000000000001,
+    "Cursor": 7.07
+  },
+  "weights": {
+    "Legacy Modernization Fit": 0.3,
+    "Deterministic Control": 0.2,
+    "Validation Visibility": 0.2,
+    "Agentic Workflow Support": 0.15,
+    "General Coding Breadth": 0.1,
+    "Ecosystem Reach": 0.05
+  },
+  "note": "Scores are rubric-based positioning for legacy modernization. Helix evidence dashboard uses local project test/benchmark counts."
+}

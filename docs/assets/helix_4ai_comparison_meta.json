@@ -1,0 +1,70 @@
+{
+  "tools": [
+    "Helix AI",
+    "OpenAI Codex/ChatGPT",
+    "GitHub Copilot",
+    "Claude Code",
+    "Cursor"
+  ],
+  "metrics": [
+    "Legacy Modernization Fit",
+    "Deterministic Control",
+    "Validation Visibility",
+    "General Coding Breadth",
+    "Ecosystem Reach",
+    "Agentic Workflow Support"
+  ],
+  "scores": {
+    "Helix AI": [
+      9.6,
+      9.1,
+      9.0,
+      4.8,
+      3.5,
+      8.2
+    ],
+    "OpenAI Codex/ChatGPT": [
+      7.2,
+      6.8,
+      7.2,
+      9.8,
+      9.0,
+      9.1
+    ],
+    "GitHub Copilot": [
+      6.8,
+      7.0,
+      7.8,
+      9.4,
+      9.8,
+      8.4
+    ],
+    "Claude Code": [
+      7.5,
+      7.4,
+      7.5,
+      9.2,
+      8.4,
+      9.3
+    ],
+    "Cursor": [
+      7.1,
+      7.1,
+      7.0,
+      9.0,
+      8.2,
+      8.8
+    ]
+  },
+  "note": "Rubric-based project positioning for legacy Python modernization; not a vendor benchmark.",
+  "official_sources": [
+    "https://openai.com/index/introducing-codex/",
+    "https://platform.openai.com/docs/codex/overview",
+    "https://docs.github.com/en/copilot/concepts/about-copilot-coding-agent",
+    "https://github.com/features/copilot/agents",
+    "https://docs.anthropic.com/en/docs/claude-code/overview",
+    "https://www.anthropic.com/claude-code",
+    "https://docs.cursor.com/",
+    "https://www.cursor.com/en"
+  ]
+}

@@ -1,0 +1,50 @@
+{
+  "sources": [
+    {
+      "name": "local_curated_modernization",
+      "path": "ml/data/modernization_train.jsonl",
+      "stage": "sft",
+      "purpose": "legacy_python_modernization_pairs",
+      "weight": 4
+    },
+    {
+      "name": "quixbugs",
+      "source_url": "https://github.com/jkoppel/QuixBugs",
+      "prepared_path": "ml/external/quixbugs_pairs.jsonl",
+      "stage": "sft",
+      "purpose": "buggy_to_fixed_python_pairs",
+      "weight": 2
+    },
+    {
+      "name": "bugsinpy",
+      "source_url": "https://github.com/soarsmu/BugsInPy",
+      "prepared_path": "ml/external/bugsinpy_pairs.jsonl",
+      "stage": "sft",
+      "purpose": "real_world_python_bug_fix_pairs",
+      "weight": 2
+    },
+    {
+      "name": "gumtree_python",
+      "source_url": "https://github.com/GumTreeDiff/datasets",
+      "prepared_path": "ml/external/gumtree_python_pairs.jsonl",
+      "stage": "sft",
+      "purpose": "before_after_python_commit_pairs",
+      "weight": 2
+    },
+    {
+      "name": "swebench_lite",
+      "source_url": "https://huggingface.co/datasets/SWE-bench/SWE-bench_Lite",
+      "prepared_path": "ml/external/swebench_lite_reasoning.jsonl",
+      "stage": "reasoning_sft",
+      "purpose": "issue_to_patch_reasoning",
+      "weight": 1
+    },
+    {
+      "name": "the_stack_python",
+      "source_url": "https://huggingface.co/datasets/bigcode/the-stack",
+      "stage": "dapt",
+      "purpose": "python_domain_adaptation",
+      "weight": 0
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "unit_tests": {
+    "ran": 10,
+    "ok": true
+  },
+  "benchmark": {
+    "size": 4,
+    "rule_pass": 4
+  },
+  "legacy_rule_count": 15,
+  "suggestion_mapping_count": 15,
+  "type_counts": {
+    "SEMANTIC_UPGRADE": 4,
+    "SYNTAX_UPGRADE": 3,
+    "API_UPGRADE": 5,
+    "TYPE_UPGRADE": 3
+  }
+}

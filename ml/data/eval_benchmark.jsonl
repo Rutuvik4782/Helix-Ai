@@ -1,0 +1,4 @@
+{"name":"print_xrange","input":"for i in xrange(3):\n    print i\n","expected_contains":["range(3)", "print(i)"],"legacy_patterns":["xrange","print_statement"]}
+{"name":"raw_input","input":"name = raw_input(\"Name: \")\nprint name\n","expected_contains":["input(\"Name: \")", "print(name)"],"legacy_patterns":["raw_input","print_statement"]}
+{"name":"except_syntax","input":"try:\n    risky()\nexcept ValueError, exc:\n    print exc\n","expected_contains":["except ValueError as exc", "print(exc)"],"legacy_patterns":["except_as","print_statement"]}
+{"name":"has_key","input":"if config.has_key('debug'):\n    print config['debug']\n","expected_contains":["'debug' in config", "print(config['debug'])"],"legacy_patterns":["has_key","print_statement"]}
