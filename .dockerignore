@@ -1,0 +1,15 @@
+.git
+.venv*
+__pycache__
+*.pyc
+*.log
+*.pid
+server.log
+server.pid
+data/*.jsonl
+data/inquiries.json
+ml/models/*
+.DS_Store
+.env
+Dockerfile
+.dockerignore

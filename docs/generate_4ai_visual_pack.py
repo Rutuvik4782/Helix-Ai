@@ -461,24 +461,15 @@ def main() -> None:
     weighted_chart, weighted, legacy_focus = save_weighted_leaderboard(tools, metric_names, scores)
     generated.append(weighted_chart)
     generated.append(save_legacy_focus_chart(tools, legacy_focus))
-    generated.append(save_breadth_control_scatter(tools, metric_names, scores))
     generated.append(save_gap_to_helix_chart(tools, metric_names, scores))
     generated.append(save_migration_risk_chart(legacy_focus))
     generated.append(save_helix_evidence_dashboard(metrics))
     summary_path = write_summary_json(weighted, legacy_focus)
 
     image_map = {
-        "helix-4ai-comparison-matrix.png": (
-            "Capability Matrix",
-            "Baseline matrix used for side-by-side tool positioning.",
-        ),
         "helix-4ai-legacy-fit-ranking.png": (
             "Legacy Fit Ranking",
             "Ranking by legacy modernization suitability for this project goal.",
-        ),
-        "helix-4ai-breadth-tradeoff.png": (
-            "Breadth Tradeoff",
-            "General coding breadth compared with modernization specialization.",
         ),
         "helix-4ai-metric-grouped-bars-v2.png": (
             "Expanded Metric Bars",
@@ -491,10 +482,6 @@ def main() -> None:
         "helix-4ai-legacy-confidence-index.png": (
             "Legacy Confidence Index",
             "Focused score from legacy fit, deterministic control, and validation visibility.",
-        ),
-        "helix-4ai-breadth-vs-control-scatter.png": (
-            "Breadth vs Control",
-            "Bubble chart where bubble size represents ecosystem reach.",
         ),
         "helix-4ai-gap-to-helix-critical-metrics.png": (
             "Gap to Helix on Critical Metrics",

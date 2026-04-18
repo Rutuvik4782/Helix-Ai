@@ -1,10 +1,10 @@
 {
   "weighted_ranking": {
     "Helix AI": 8.385,
-    "OpenAI Codex/ChatGPT": 7.755000000000002,
+    "OpenAI Codex/ChatGPT": 7.755000000000001,
     "GitHub Copilot": 7.69,
     "Claude Code": 7.965,
-    "Cursor": 7.580000000000001
+    "Cursor": 7.58
   },
   "legacy_confidence_index": {
     "Helix AI": 9.27,
