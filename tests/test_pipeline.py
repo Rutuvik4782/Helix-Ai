@@ -69,6 +69,14 @@ class PipelineTests(unittest.TestCase):
         self.assertEqual(result["stage"], "LINT")
         self.assertIn("xrange", result["error"])
 
+    def test_validation_detects_incomplete_trailing_block(self):
+        validator = ValidationCore()
+        result = validator.detect_incomplete_input("for i in xrange(3):\n")
+
+        self.assertFalse(result["success"])
+        self.assertEqual(result["stage"], "INPUT")
+        self.assertIn("incomplete", result["error"])
+
     def test_pipeline_handles_very_old_legacy_patterns(self):
         analyzer = AnalyzerAgent()
         suggester = SuggestionAgent()

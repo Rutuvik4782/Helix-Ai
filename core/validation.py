@@ -19,6 +19,31 @@ LEGACY_REMAINDER_PATTERNS = {
 
 
 class ValidationCore:
+    def detect_incomplete_input(self, code: str) -> Dict[str, Any]:
+        lines = code.splitlines()
+        for index in range(len(lines) - 1, -1, -1):
+            stripped = lines[index].strip()
+            if stripped and not stripped.startswith("#"):
+                if stripped.endswith(":"):
+                    return {
+                        "success": False,
+                        "stage": "INPUT",
+                        "error": f"Input appears incomplete: line {index + 1} ends with ':' but has no block body.",
+                        "warnings": [],
+                        "line": index + 1,
+                    }
+                if stripped.endswith("\\"):
+                    return {
+                        "success": False,
+                        "stage": "INPUT",
+                        "error": f"Input appears incomplete: line {index + 1} ends with a line continuation.",
+                        "warnings": [],
+                        "line": index + 1,
+                    }
+                break
+
+        return {"success": True, "stage": "INPUT", "warnings": []}
+
     def validate(self, original_code: str, new_code: str) -> Dict[str, Any]:
         warnings: List[str] = []
 

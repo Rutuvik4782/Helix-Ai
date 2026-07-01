@@ -75,18 +75,78 @@ class ExecutionCore:
         return re.sub(r"`([^`\n]+)`", r"repr(\1)", code)
 
     def _upgrade_apply_builtin(self, code: str) -> str:
-        def replace(match):
-            fn_name = match.group(1).strip()
-            args_expr = match.group(2).strip()
-            kwargs_expr = match.group(3)
-            if kwargs_expr:
-                return f"{fn_name}(*{args_expr}, **{kwargs_expr.strip()})"
-            return f"{fn_name}(*{args_expr})"
+        def _find_apply_args(text, start):
+            """Parse balanced parentheses to extract apply() arguments correctly."""
+            depth = 0
+            i = start
+            while i < len(text):
+                if text[i] in '([{':
+                    depth += 1
+                elif text[i] in ')]}':
+                    depth -= 1
+                    if depth == 0:
+                        return i
+                i += 1
+            return -1
 
-        pattern = re.compile(
-            r"\bapply\s*\(\s*([A-Za-z_][\w\.]*)\s*,\s*([^,\n][^,\n]*)\s*(?:,\s*([^)]+?)\s*)?\)"
-        )
-        return pattern.sub(replace, code)
+        def _split_top_level_args(inner):
+            """Split arguments at top-level commas only (not inside nested brackets)."""
+            args = []
+            depth = 0
+            current = []
+            for ch in inner:
+                if ch in '([{':
+                    depth += 1
+                    current.append(ch)
+                elif ch in ')]}':
+                    depth -= 1
+                    current.append(ch)
+                elif ch == ',' and depth == 0:
+                    args.append(''.join(current).strip())
+                    current = []
+                else:
+                    current.append(ch)
+            if current:
+                args.append(''.join(current).strip())
+            return args
+
+        result = code
+        apply_pattern = re.compile(r'\bapply\s*\(')
+        offset = 0
+        for match in apply_pattern.finditer(code):
+            match_start = match.start() + offset
+            paren_start = match.end() - 1 + offset  # position of '('
+            paren_end = _find_apply_args(result, paren_start)
+            if paren_end == -1:
+                continue
+
+            inner = result[paren_start + 1:paren_end]
+            parts = _split_top_level_args(inner)
+
+            if len(parts) < 2:
+                continue
+
+            fn_name = parts[0].strip()
+            args_expr = parts[1].strip()
+            # Remove outer tuple wrapper if present: ([1,2,3],) -> [1,2,3]
+            if args_expr.startswith('(') and args_expr.endswith(',)'):
+                args_expr = args_expr[1:-2].strip()
+            elif args_expr.startswith('(') and args_expr.endswith(')'):
+                inner_check = args_expr[1:-1].strip()
+                if inner_check.endswith(','):
+                    args_expr = inner_check[:-1].strip()
+
+            if len(parts) == 3:
+                kwargs_expr = parts[2].strip()
+                replacement = f"{fn_name}(*{args_expr}, **{kwargs_expr})"
+            else:
+                replacement = f"{fn_name}(*{args_expr})"
+
+            old_len = paren_end + 1 - match_start
+            result = result[:match_start] + replacement + result[paren_end + 1:]
+            offset += len(replacement) - old_len
+
+        return result
 
     def _upgrade_exec_statement(self, code: str) -> str:
         upgraded_lines: List[str] = []

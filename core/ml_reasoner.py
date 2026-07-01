@@ -1,3 +1,4 @@
+import importlib.util
 import os
 from dataclasses import dataclass
 from typing import Optional
@@ -37,24 +38,29 @@ class MLReasoner:
         self._load_error: Optional[str] = None
 
     def is_available(self) -> bool:
-        return self.enabled and bool(self.adapter_path) and os.path.exists(self.adapter_path)
+        return self.enabled and self._readiness_error() is None
 
     def explain_status(self) -> dict:
+        readiness_error = self._readiness_error() if self.enabled else None
         return {
             "enabled": self.enabled,
-            "available": self.is_available(),
+            "available": self.enabled and readiness_error is None,
             "model_path": self.adapter_path,
-            "error": self._load_error,
+            "adapter_exists": self._adapter_exists(),
+            "device": self._device,
+            "loaded": self._model is not None and self._tokenizer is not None,
+            "error": self._load_error or readiness_error,
         }
 
     def modernize(self, code: str, max_new_tokens: int = 256) -> MLInferenceResult:
         if not self.enabled:
             return MLInferenceResult(enabled=False, available=False, error="ML model is disabled.")
-        if not self.is_available():
+        readiness_error = self._readiness_error()
+        if readiness_error:
             return MLInferenceResult(
                 enabled=True,
                 available=False,
-                error="Adapter path is missing or not trained yet.",
+                error=readiness_error,
                 model_path=self.adapter_path,
             )
 
@@ -64,7 +70,7 @@ class MLReasoner:
             inputs = self._tokenizer([prompt], return_tensors="pt").to(self._device)
             outputs = self._model.generate(**inputs, max_new_tokens=max_new_tokens)
             decoded = self._tokenizer.decode(outputs[0], skip_special_tokens=True)
-            final_output = decoded.split("### Response:")[-1].strip()
+            final_output = self._clean_generated_code(decoded.split("### Response:")[-1])
             return MLInferenceResult(
                 enabled=True,
                 available=True,
@@ -80,6 +86,44 @@ class MLReasoner:
                 model_path=self.adapter_path,
             )
 
+    def _adapter_exists(self) -> bool:
+        return bool(self.adapter_path) and os.path.exists(self.adapter_path)
+
+    def _dependency_error(self) -> Optional[str]:
+        missing = [
+            package
+            for package in ("torch", "peft", "transformers")
+            if importlib.util.find_spec(package) is None
+        ]
+        if missing:
+            return f"ML dependencies are missing: {', '.join(missing)}. Install requirements-ml.txt."
+        return None
+
+    def _readiness_error(self) -> Optional[str]:
+        if not self._adapter_exists():
+            return "Adapter path is missing or not trained yet."
+        return self._dependency_error()
+
+    def _clean_generated_code(self, text: str) -> str:
+        cleaned = text.strip()
+        if cleaned.startswith("```"):
+            cleaned = cleaned.split("\n", 1)[-1]
+        for marker in (
+            "\n```",
+            "\n### Instruction:",
+            "\n### Input:",
+            "\n### Response:",
+            "\n<|fim_middle|>",
+            "\n<|im_end|>",
+            "\n\\end{document}",
+            "\n'''",
+            '\n"""',
+            "\n# Example",
+        ):
+            if marker in cleaned:
+                cleaned = cleaned.split(marker, 1)[0]
+        return cleaned.strip()
+
     def _ensure_loaded(self) -> None:
         if self._model is not None and self._tokenizer is not None:
             return
@@ -91,14 +135,28 @@ class MLReasoner:
         except ImportError as exc:
             raise RuntimeError("ML dependencies are missing. Install requirements-ml.txt.") from exc
 
-        self._device = "mps" if torch.backends.mps.is_available() else ("cuda" if torch.cuda.is_available() else "cpu")
+        # Use CUDA if available, otherwise fall back to CPU.
+        # MPS (Apple Metal) is intentionally skipped because the Qwen2.5-Coder
+        # model requires ~11.8 GB of contiguous GPU memory, which exceeds the
+        # Metal buffer allocation limit on most Apple Silicon Macs.
+        if torch.cuda.is_available():
+            self._device = "cuda"
+        else:
+            self._device = "cpu"
+
         try:
-            self._tokenizer = AutoTokenizer.from_pretrained(self.adapter_path)
-        except Exception:
-            self._tokenizer = AutoTokenizer.from_pretrained(self.base_model)
-        model = AutoModelForCausalLM.from_pretrained(
-            self.base_model,
-            torch_dtype=torch.float16 if self._device != "cpu" else torch.float32,
-        )
-        self._model = PeftModel.from_pretrained(model, self.adapter_path)
-        self._model.to(self._device)
+            try:
+                self._tokenizer = AutoTokenizer.from_pretrained(self.adapter_path)
+            except Exception:
+                self._tokenizer = AutoTokenizer.from_pretrained(self.base_model)
+            model = AutoModelForCausalLM.from_pretrained(
+                self.base_model,
+                torch_dtype=torch.float16 if self._device == "cuda" else torch.float32,
+            )
+            self._model = PeftModel.from_pretrained(model, self.adapter_path)
+            self._model.to(self._device)
+        except Exception as exc:
+            self._load_error = f"Model loading failed: {exc}"
+            self._model = None
+            self._tokenizer = None
+            raise RuntimeError(self._load_error) from exc

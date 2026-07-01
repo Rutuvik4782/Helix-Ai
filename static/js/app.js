@@ -14,7 +14,9 @@ const SAMPLE_SNIPPETS = {
 const state = {
     originalCode: "",
     newCode: "",
+    candidateCode: "",
     diff: "",
+    candidateDiff: "",
     report: "",
     runId: "",
     analysis: null,
@@ -24,6 +26,8 @@ const state = {
     validation: null,
     ml: null,
     logs: [],
+    rolledBack: false,
+    outputAvailable: false,
 };
 
 const codeInput = document.getElementById("codeInput");
@@ -163,11 +167,15 @@ async function handleAnalyze() {
 
     state.originalCode = code;
     state.newCode = "";
+    state.candidateCode = "";
     state.diff = "";
+    state.candidateDiff = "";
     state.report = "";
     state.runId = "";
     state.validation = null;
     state.logs = [];
+    state.rolledBack = false;
+    state.outputAvailable = false;
 
     resetUi(false);
     setStepState("analyze");
@@ -271,10 +279,14 @@ async function handleModernize() {
         state.plan = data.plan || state.plan;
         state.validation = data.validation || null;
         state.newCode = data.new_code || "";
+        state.candidateCode = data.candidate_code || "";
         state.diff = data.diff || "";
+        state.candidateDiff = data.candidate_diff || "";
         state.report = data.report || "";
         state.ml = data.ml_reasoner || state.ml;
         state.logs = data.logs || [];
+        state.rolledBack = Boolean(data.rolled_back);
+        state.outputAvailable = Boolean(data.output_available && state.validation?.success && state.newCode);
 
         renderSummary();
         renderReview();
@@ -283,7 +295,7 @@ async function handleModernize() {
         renderReport();
         renderLogs();
         renderMlSummary(state.ml);
-        activateTab(state.diff ? "diff" : "output");
+        activateTab(state.diff || state.candidateDiff ? "diff" : "output");
 
         updateOutputDownload();
         if (state.report) {
@@ -294,20 +306,20 @@ async function handleModernize() {
 
         setStepState("validate", ["analyze", "review", "modernize"]);
         setMode(state.analysis?.mode || "Safe");
-        setStatus(state.validation?.success ? "Validated" : "Needs Review");
+        setStatus(state.validation?.success ? "Validated" : (state.rolledBack ? "Rolled Back" : "No Safe Output"));
         setFocus(
             state.validation?.success
                 ? "Modernization finished. Review the diff, then apply the updated code if you want to continue editing it."
-                : "Modernization finished with warnings. Review the diff and report before trusting the result."
+                : "Modernization did not produce a safe output. Review the validation error and fix the source before downloading anything."
         );
-        setPrimaryAction(state.newCode && state.newCode !== state.originalCode ? "apply" : "analyze");
+        setPrimaryAction(state.outputAvailable && state.newCode !== state.originalCode ? "apply" : "analyze");
 
         if (state.runId) {
             log(`Saved run ${state.runId}.`, "success");
             loadRunHistory();
         }
 
-        showToast(state.validation?.success ? "Modernization completed" : "Modernization finished with warnings", state.validation?.success ? "success" : "error");
+        showToast(state.validation?.success ? "Modernization completed" : "No safe output produced", state.validation?.success ? "success" : "error");
     } catch (error) {
         setMode("Error");
         setStatus("Modernization Failed");
@@ -455,10 +467,14 @@ async function handleRunHistoryClick(event) {
         state.runId = data.run_id || "";
         state.originalCode = data.original_code || "";
         state.newCode = data.new_code || "";
+        state.candidateCode = data.candidate_code || "";
         state.analysis = data.analysis || null;
         state.validation = data.validation || null;
         state.diff = data.diff || "";
+        state.candidateDiff = data.candidate_diff || "";
         state.report = data.report || "";
+        state.rolledBack = Boolean(data.rolled_back);
+        state.outputAvailable = Boolean(data.output_available && state.validation?.success && state.newCode);
         state.logs = [
             `Loaded saved run ${state.runId}.`,
             `Validation status: ${data.validation_success ? "validated" : "needs review"}.`,
@@ -480,7 +496,7 @@ async function handleRunHistoryClick(event) {
         setMode(state.analysis?.mode || "Review");
         setStatus(data.validation_success ? "Validated" : "Needs Review");
         setFocus("Saved run loaded. Review the diff, output, or report without changing the editor.");
-        setPrimaryAction(state.newCode && state.newCode !== state.originalCode ? "apply" : "analyze");
+        setPrimaryAction(state.outputAvailable && state.newCode !== state.originalCode ? "apply" : "analyze");
         showToast("Saved run loaded", "success");
     } catch (error) {
         showToast(error.message || "Failed to load saved run", "error");
@@ -518,6 +534,7 @@ function renderReview() {
     const warnings = [
         ...(state.analysis.semantic_risks || []).map((risk) => risk.message),
         ...(state.validation?.warnings || []),
+        ...(state.validation && !state.validation.success ? [state.validation.error || state.validation.message || "Validation failed."] : []),
     ];
     const riskTone = riskToneClasses(state.analysis.risk_score);
 
@@ -576,6 +593,28 @@ function renderReview() {
 
 function renderDiff() {
     if (!state.diff) {
+        if (state.candidateDiff) {
+            diffPanel.innerHTML = `
+                <div class="panel-shell space-y-4">
+                    <div class="rounded-2xl border border-rose-500/20 bg-rose-500/10 p-4 text-sm leading-6 text-rose-100">
+                        Candidate changes were generated, but validation failed. This diff is for diagnosis only and is not downloadable as safe output.
+                    </div>
+                    <div class="space-y-1 font-mono text-xs">${state.candidateDiff.split("\n").map((line) => {
+                        let className = "text-zinc-300";
+                        if (line.startsWith("+") && !line.startsWith("+++")) {
+                            className = "diff-line add";
+                        } else if (line.startsWith("-") && !line.startsWith("---")) {
+                            className = "diff-line remove";
+                        } else if (line.startsWith("@@") || line.startsWith("---") || line.startsWith("+++")) {
+                            className = "diff-line meta";
+                        }
+                        return `<div class="${className} rounded-md px-2 py-1">${escapeHtml(line || " ")}</div>`;
+                    }).join("")}</div>
+                </div>
+            `;
+            updateResultActions();
+            return;
+        }
         renderPanelPlaceholder(
             diffPanel,
             "Diff preview will appear here",
@@ -601,11 +640,13 @@ function renderDiff() {
 }
 
 function renderOutput() {
-    if (!state.newCode) {
+    if (!state.outputAvailable || !state.newCode) {
         renderTextPlaceholder(
             outputPanel,
-            "Output preview will appear here",
-            "The editor stays untouched until you review the result and choose Apply Changes."
+            state.validation && !state.validation.success ? "No safe output was produced" : "Output preview will appear here",
+            state.validation && !state.validation.success
+                ? "Validation failed, so Helix did not expose a downloadable modernized file. Fix the source and run modernization again."
+                : "The editor stays untouched until you review the result and choose Apply Changes."
         );
     } else {
         outputPanel.textContent = state.newCode;
@@ -807,13 +848,13 @@ async function copyPanelContent(kind) {
 
 function updateResultActions() {
     copyDiffBtn.classList.toggle("hidden", !state.diff);
-    copyOutputBtn.classList.toggle("hidden", !state.newCode);
-    downloadOutput.classList.toggle("hidden", !state.newCode);
-    downloadOutputTop.classList.toggle("hidden", !state.newCode);
+    copyOutputBtn.classList.toggle("hidden", !state.outputAvailable || !state.newCode);
+    downloadOutput.classList.toggle("hidden", !state.outputAvailable || !state.newCode);
+    downloadOutputTop.classList.toggle("hidden", !state.outputAvailable || !state.newCode);
 }
 
 function updateOutputDownload() {
-    if (!state.newCode) {
+    if (!state.outputAvailable || !state.newCode) {
         downloadOutput.classList.add("hidden");
         downloadOutputTop.classList.add("hidden");
         return;

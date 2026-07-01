@@ -11,6 +11,11 @@ except ValueError, exc:
     print exc
 """
 
+TRUNCATED_LEGACY_SAMPLE = """def broken(values):
+    print "start"
+    for item in xrange(3):
+"""
+
 
 class ApiTests(unittest.TestCase):
     @classmethod
@@ -40,6 +45,18 @@ class ApiTests(unittest.TestCase):
         self.assertIn("print(exc)", payload["new_code"])
         self.assertTrue(payload["validation"]["success"])
 
+    def test_refactor_rejects_incomplete_input_without_downloadable_output(self):
+        response = self.client.post("/refactor", json={"code": TRUNCATED_LEGACY_SAMPLE})
+        self.assertEqual(response.status_code, 200)
+
+        payload = response.json()
+        self.assertFalse(payload["validation"]["success"])
+        self.assertEqual(payload["validation"]["stage"], "INPUT")
+        self.assertFalse(payload["output_available"])
+        self.assertEqual(payload["new_code"], "")
+        self.assertEqual(payload["candidate_code"], "")
+        self.assertIn("incomplete", payload["validation"]["error"])
+
     def test_health_and_model_status_endpoints(self):
         health = self.client.get("/health")
         model_status = self.client.get("/model-status")
@@ -48,6 +65,15 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(model_status.status_code, 200)
         self.assertEqual(health.json()["status"], "ok")
         self.assertIn("available", model_status.json())
+
+    def test_page_routes_render(self):
+        landing = self.client.get("/")
+        app_page = self.client.get("/app")
+
+        self.assertEqual(landing.status_code, 200)
+        self.assertEqual(app_page.status_code, 200)
+        self.assertIn("text/html", landing.headers["content-type"])
+        self.assertIn("text/html", app_page.headers["content-type"])
 
     def test_runs_endpoints_return_stored_history(self):
         refactor = self.client.post("/refactor", json={"code": LEGACY_SAMPLE})

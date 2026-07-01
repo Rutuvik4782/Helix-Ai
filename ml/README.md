@@ -102,8 +102,14 @@ python3 ml/build_training_mixture.py
 5. Train locally or on Colab:
 
 ```bash
-pip install -r requirements-ml.txt
+pip install -r requirements-train.txt
 python3 ml/train_modernizer_unsloth.py --data-path ml/data/training_mixture.jsonl
+```
+
+For local app inference only, use the lighter runtime set:
+
+```bash
+pip install -r requirements.txt -r requirements-ml.txt
 ```
 
 For the best practical route, use Google Colab and the assets in:

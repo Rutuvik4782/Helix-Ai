@@ -103,7 +103,7 @@ INFO_PAGES = {
 
 @app.get("/", response_class=HTMLResponse)
 async def read_landing(request: Request):
-    return templates.TemplateResponse("new.html", {"request": request})
+    return templates.TemplateResponse(request, "new.html")
 
 
 @app.get("/health")
@@ -138,7 +138,7 @@ async def get_run(run_id: str):
 
 @app.get("/app", response_class=HTMLResponse)
 async def read_app(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request, "app_name": settings.APP_NAME})
+    return templates.TemplateResponse(request, "index.html", {"app_name": settings.APP_NAME})
 
 
 @app.get("/info/{page_name}", response_class=HTMLResponse)
@@ -148,9 +148,9 @@ async def read_info_page(request: Request, page_name: str):
         raise HTTPException(status_code=404, detail="Page not found")
 
     return templates.TemplateResponse(
+        request,
         "info.html",
         {
-            "request": request,
             "page_title": page_data["title"],
             "content": page_data["content"],
         },
@@ -227,6 +227,56 @@ async def refactor_code(request: CodeRequest):
         logs.append(f"Analyzer: probable source version = {analysis.get('probable_source_version')}")
         logs.append(f"Analyzer: detected {len(analysis.get('legacy_issues', []))} legacy issues.")
 
+        input_validation = validator.detect_incomplete_input(request.code)
+        if not input_validation["success"]:
+            logs.append(f"Input validation failed: {input_validation.get('error')}")
+            logs.append("Execution skipped because the source file appears incomplete.")
+            report = reporter.generate_report(
+                analysis=analysis,
+                selected_plans=[],
+                success=False,
+                validation_logs=logs,
+                validation_result=input_validation,
+            )
+            run_record = run_store.save_run(
+                {
+                    "probable_source_version": analysis.get("probable_source_version"),
+                    "risk_score": analysis.get("risk_score"),
+                    "legacy_issue_count": len(analysis.get("legacy_issues", [])),
+                    "validation_success": False,
+                    "applied_transformations": [],
+                    "original_code": request.code,
+                    "new_code": "",
+                    "candidate_code": "",
+                    "analysis": analysis,
+                    "validation": input_validation,
+                    "diff": "",
+                    "candidate_diff": "",
+                    "report": report,
+                    "rolled_back": False,
+                    "output_available": False,
+                }
+            )
+            return JSONResponse(
+                content={
+                    "run_id": run_record["run_id"],
+                    "original_code": request.code,
+                    "new_code": "",
+                    "candidate_code": "",
+                    "analysis": analysis,
+                    "suggestions": [],
+                    "plan": {"selected_plan": None, "selected_plans": [], "total_candidates": 0, "approved_count": 0, "candidates": []},
+                    "validation": input_validation,
+                    "logs": logs,
+                    "report": report,
+                    "diff": "",
+                    "candidate_diff": "",
+                    "rolled_back": False,
+                    "output_available": False,
+                    "ml_reasoner": reasoner.explain_status(),
+                }
+            )
+
         if analysis.get("mode") == "BLOCKED":
             logs.append("Execution blocked due to critical dynamic execution risk.")
             return JSONResponse(content={"error": "Blocked", "logs": logs, "analysis": analysis})
@@ -240,22 +290,25 @@ async def refactor_code(request: CodeRequest):
         logs.append(f"Suggester: generated {len(suggestions)} migration suggestions.")
         logs.append(f"Planner: selected {len(selected_plans)} transformations for execution.")
 
-        new_code = request.code
+        candidate_code = request.code
+        new_code = ""
         validation_result = {"success": False, "stage": "SKIPPED", "message": "No changes applied.", "warnings": []}
         validation_success = False
+        rolled_back = False
 
         if selected_plans:
-            new_code = executor.apply_changes(request.code, selected_plans)
+            candidate_code = executor.apply_changes(request.code, selected_plans)
             logs.append("Execution: transformations applied sequentially.")
 
-            validation_result = validator.validate(request.code, new_code)
+            validation_result = validator.validate(request.code, candidate_code)
             if validation_result["success"]:
                 validation_success = True
+                new_code = candidate_code
                 logs.append("Validation: modernization passed all configured checks.")
             else:
+                rolled_back = True
                 logs.append(f"Validation failed: {validation_result.get('error')}")
-                logs.append("Rollback: reverting to original code.")
-                new_code = request.code
+                logs.append("Rollback: no safe output was produced.")
         else:
             logs.append("Planner: no executable transformations were selected.")
 
@@ -274,7 +327,17 @@ async def refactor_code(request: CodeRequest):
                 tofile="modernized.py",
                 lineterm="",
             )
-        )
+        ) if validation_success else ""
+
+        candidate_diff = "\n".join(
+            difflib.unified_diff(
+                request.code.splitlines(),
+                candidate_code.splitlines(),
+                fromfile="legacy.py",
+                tofile="candidate.py",
+                lineterm="",
+            )
+        ) if candidate_code != request.code else ""
 
         report = reporter.generate_report(
             analysis=analysis,
@@ -292,10 +355,14 @@ async def refactor_code(request: CodeRequest):
                 "applied_transformations": [plan["suggestion"]["id"] for plan in selected_plans],
                 "original_code": request.code,
                 "new_code": new_code,
+                "candidate_code": candidate_code if not validation_success else "",
                 "analysis": analysis,
                 "validation": validation_result,
                 "diff": diff,
+                "candidate_diff": candidate_diff,
                 "report": report,
+                "rolled_back": rolled_back,
+                "output_available": validation_success,
             }
         )
         run_id = run_record["run_id"]
@@ -305,6 +372,7 @@ async def refactor_code(request: CodeRequest):
                 "run_id": run_id,
                 "original_code": request.code,
                 "new_code": new_code,
+                "candidate_code": candidate_code if not validation_success else "",
                 "analysis": analysis,
                 "suggestions": suggestions,
                 "plan": plan_result,
@@ -312,6 +380,9 @@ async def refactor_code(request: CodeRequest):
                 "logs": logs,
                 "report": report,
                 "diff": diff,
+                "candidate_diff": candidate_diff,
+                "rolled_back": rolled_back,
+                "output_available": validation_success,
                 "ml_reasoner": ml_result.__dict__ if ml_result else reasoner.explain_status(),
             }
         )

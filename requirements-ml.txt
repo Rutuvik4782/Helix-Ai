@@ -1,8 +1,5 @@
 accelerate
-datasets
 peft
 sentencepiece
 torch
 transformers>=4.37.0
-trl
-unsloth
