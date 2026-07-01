@@ -184,3 +184,8 @@ pyrightconfig.json
 ml/models/
 *.safetensors
 *.bin
+
+# Ignore project reports, slides, and academic papers
+*.pdf
+*.docx
+*.pptx
