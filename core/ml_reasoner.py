@@ -68,7 +68,7 @@ class MLReasoner:
             "error": self._load_error or readiness_error,
         }
 
-    def modernize(self, code: str, max_new_tokens: int = 256, few_shot_examples: List[Dict[str, Any]] = None) -> MLInferenceResult:
+    def modernize(self, code: str, max_new_tokens: int = 256, few_shot_examples: List[Dict[str, Any]] = None, plan: Dict[str, Any] = None) -> MLInferenceResult:
         if not self.enabled:
             return MLInferenceResult(enabled=False, available=False, error="ML model is disabled.")
         readiness_error = self._readiness_error()
@@ -82,16 +82,12 @@ class MLReasoner:
 
         try:
             self._ensure_loaded()
-            if few_shot_examples:
-                examples_texts = []
-                for i, ex in enumerate(few_shot_examples, 1):
-                    examples_texts.append(
-                        f"Example {i}:\n### Input:\n{ex['input_code']}\n### Response:\n{ex['output_code']}"
-                    )
-                examples_text = "\n\n".join(examples_texts)
-                prompt = PROMPT_TEMPLATE_WITH_EXAMPLES.format(examples_text=examples_text, input_code=code)
-            else:
-                prompt = PROMPT_TEMPLATE.format(input_code=code)
+            from core.prompt_builder import PromptBuilder
+            prompt = PromptBuilder().build(
+                code=code,
+                few_shot_examples=few_shot_examples,
+                plan=plan,
+            )
 
             inputs = self._tokenizer([prompt], return_tensors="pt").to(self._device)
             outputs = self._model.generate(**inputs, max_new_tokens=max_new_tokens)

@@ -139,6 +139,42 @@ ISSUE_TO_SUGGESTION = {
         "confidence": 0.86,
         "priority": 22,
     },
+    "octal_literals": {
+        "id": "upgrade_octal_literals",
+        "type": "SYNTAX_UPGRADE",
+        "target": "octal literals",
+        "suggestion": "octal_format",
+        "reasoning": "Convert legacy octal syntax to Python 3 (0755 to 0o755).",
+        "confidence": 0.98,
+        "priority": 11,
+    },
+    "reduce_usage": {
+        "id": "upgrade_reduce",
+        "type": "API_UPGRADE",
+        "target": "reduce builtin",
+        "suggestion": "functools_reduce",
+        "reasoning": "reduce() is no longer a builtin, import from functools.",
+        "confidence": 0.99,
+        "priority": 21,
+    },
+    "reload_usage": {
+        "id": "upgrade_reload",
+        "type": "API_UPGRADE",
+        "target": "reload builtin",
+        "suggestion": "importlib_reload",
+        "reasoning": "reload() is no longer a builtin, import from importlib.",
+        "confidence": 0.99,
+        "priority": 21,
+    },
+    "urllib2_usage": {
+        "id": "upgrade_urllib2",
+        "type": "API_UPGRADE",
+        "target": "urllib2 import",
+        "suggestion": "urllib_request",
+        "reasoning": "urllib2 module is removed in Python 3, replace with urllib.request.",
+        "confidence": 0.95,
+        "priority": 22,
+    },
 }
 
 

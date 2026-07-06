@@ -48,6 +48,18 @@ class ExecutionCore:
             return re.sub(r"\bbasestring\b", "str", code)
         if op == "upgrade_long":
             return re.sub(r"\blong\b", "int", code)
+        if op == "upgrade_octal_literals":
+            return re.sub(r"\b0([0-7]+)\b", r"0o\1", code)
+        if op == "upgrade_reduce":
+            if "reduce" in code and "from functools import reduce" not in code:
+                return "from functools import reduce\n" + code
+            return code
+        if op == "upgrade_reload":
+            if "reload" in code and "from importlib import reload" not in code:
+                return "from importlib import reload\n" + code
+            return code
+        if op == "upgrade_urllib2":
+            return code.replace("import urllib2", "import urllib.request as urllib2")
         return code
 
     def _upgrade_print_statements(self, code: str) -> str:

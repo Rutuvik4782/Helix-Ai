@@ -181,6 +181,38 @@ def init_db():
                 "message": "Legacy exec statement detected.",
                 "replacement": "Convert exec statement syntax to exec(...).",
                 "risk": "HIGH"
+            },
+            {
+                "id": "octal_literals",
+                "pattern": r"\b0[0-7]+\b",
+                "source_hint": "Python 2.x",
+                "message": "Legacy octal literal syntax detected.",
+                "replacement": "Replace 0755 with 0o755.",
+                "risk": "HIGH"
+            },
+            {
+                "id": "reduce_usage",
+                "pattern": r"\breduce\s*\(",
+                "source_hint": "Python 2.x",
+                "message": "reduce() is no longer a builtin in Python 3.",
+                "replacement": "Import from functools (from functools import reduce).",
+                "risk": "MEDIUM"
+            },
+            {
+                "id": "reload_usage",
+                "pattern": r"\breload\s*\(",
+                "source_hint": "Python 2.x",
+                "message": "reload() is no longer a builtin in Python 3.",
+                "replacement": "Import from importlib (from importlib import reload).",
+                "risk": "MEDIUM"
+            },
+            {
+                "id": "urllib2_usage",
+                "pattern": r"\bimport\s+urllib2\b",
+                "source_hint": "Python 2.x",
+                "message": "urllib2 module is removed in Python 3.",
+                "replacement": "Use urllib.request instead.",
+                "risk": "HIGH"
             }
         ]
         for rule in initial_rules:

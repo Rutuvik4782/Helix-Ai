@@ -342,7 +342,7 @@ async def refactor_code(request: CodeRequest):
             logs.append("Planner: no executable transformations were selected.")
 
         if reasoner.is_available():
-            ml_result = reasoner.modernize(request.code, few_shot_examples=few_shot_examples)
+            ml_result = reasoner.modernize(request.code, few_shot_examples=few_shot_examples, plan=plan_result)
             if ml_result.available and ml_result.output:
                 logs.append("ML Reasoner: generated auxiliary modernization output.")
             elif ml_result.error:
