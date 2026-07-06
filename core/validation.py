@@ -86,7 +86,29 @@ class ValidationCore:
 
     def _check_lint(self, code: str) -> Dict[str, Any]:
         warnings: List[str] = []
-        leftovers = [name for name, pattern in LEGACY_REMAINDER_PATTERNS.items() if pattern.search(code)]
+
+        db_rules = []
+        try:
+            from core.database import get_migration_rules
+            db_rules = get_migration_rules()
+        except Exception:
+            pass
+
+        patterns_to_check = {}
+        if db_rules:
+            for rule in db_rules:
+                flags = 0
+                if rule["id"] in ("print_statement", "except_comma", "exec_statement"):
+                    flags = re.MULTILINE
+                try:
+                    patterns_to_check[rule["id"]] = re.compile(rule["pattern"], flags)
+                except Exception:
+                    pass
+
+        if not patterns_to_check:
+            patterns_to_check = LEGACY_REMAINDER_PATTERNS
+
+        leftovers = [name for name, pattern in patterns_to_check.items() if pattern.search(code)]
         if leftovers:
             return {
                 "success": False,

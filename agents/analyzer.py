@@ -3,6 +3,7 @@ import re
 from typing import Any, Dict, List
 
 from agents.base_agent import BaseAgent
+from core.database import get_migration_rules
 
 
 LEGACY_RULES = [
@@ -219,7 +220,34 @@ class AnalyzerAgent(BaseAgent):
         lines = code.splitlines()
         issues: List[Dict[str, Any]] = []
 
-        for rule in LEGACY_RULES:
+        db_rules = []
+        try:
+            db_rules = get_migration_rules()
+        except Exception:
+            pass
+
+        rules_to_use = []
+        if db_rules:
+            for rule in db_rules:
+                flags = 0
+                if rule["id"] in ("print_statement", "except_comma", "exec_statement"):
+                    flags = re.MULTILINE
+                try:
+                    rules_to_use.append({
+                        "id": rule["id"],
+                        "pattern": re.compile(rule["pattern"], flags),
+                        "source_hint": rule["source_hint"],
+                        "message": rule["message"],
+                        "replacement": rule["replacement"],
+                        "risk": rule["risk"]
+                    })
+                except Exception:
+                    pass
+
+        if not rules_to_use:
+            rules_to_use = LEGACY_RULES
+
+        for rule in rules_to_use:
             for match in rule["pattern"].finditer(code):
                 line_number = code[: match.start()].count("\n") + 1
                 preview = lines[line_number - 1].strip() if line_number - 1 < len(lines) else ""

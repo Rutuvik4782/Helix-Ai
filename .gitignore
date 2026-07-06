@@ -190,3 +190,4 @@ ml/models/
 *.docx
 *.pptx
 *Screenshot*
+*.db

@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     TEMPLATE_DIR: str = os.path.join(BASE_DIR, "templates")
     STATIC_DIR: str = os.path.join(BASE_DIR, "static")
     RUN_HISTORY_FILE: str = os.getenv("RUN_HISTORY_FILE", os.path.join(BASE_DIR, "data", "modernization_runs.jsonl"))
+    DATABASE_PATH: str = os.getenv("DATABASE_PATH", os.path.join(BASE_DIR, "data", "helix_ai.db"))
     MAX_INPUT_LINES: int = int(os.getenv("MAX_INPUT_LINES", "2500"))
     MAX_INPUT_CHARS: int = int(os.getenv("MAX_INPUT_CHARS", "200000"))
 

@@ -15,18 +15,23 @@ from agents.analyzer import AnalyzerAgent
 from agents.critic import CriticAgent
 from agents.planner import PlannerAgent
 from agents.suggester import SuggestionAgent
+from agents.search_agent import SearchAgent
 from core.config import settings
+from core.database import init_db
 from core.execution import ExecutionCore
 from core.ml_reasoner import MLReasoner
 from core.report_generator import ReportGenerator
 from core.run_store import RunStore
 from core.validation import ValidationCore
 
+# Initialize database
+init_db()
 
 analyzer = AnalyzerAgent()
 suggester = SuggestionAgent()
 critic = CriticAgent()
 planner = PlannerAgent()
+search_agent = SearchAgent()
 executor = ExecutionCore()
 validator = ValidationCore()
 reporter = ReportGenerator()
@@ -224,6 +229,17 @@ async def refactor_code(request: CodeRequest):
         if not analysis.get("success"):
             return JSONResponse(content={"error": "Analysis failed", "details": analysis.get("error")})
 
+        # Query Search Agent for few-shot examples based on legacy pattern IDs
+        pattern_ids = [issue["id"] for issue in analysis.get("legacy_issues", [])]
+        few_shot_examples = []
+        if pattern_ids:
+            try:
+                few_shot_examples = await search_agent.process(pattern_ids)
+                if few_shot_examples:
+                    logs.append(f"Search Agent: retrieved {len(few_shot_examples)} few-shot examples from knowledge base.")
+            except Exception as exc:
+                logs.append(f"Search Agent error: {exc}")
+
         logs.append(f"Analyzer: probable source version = {analysis.get('probable_source_version')}")
         logs.append(f"Analyzer: detected {len(analysis.get('legacy_issues', []))} legacy issues.")
 
@@ -305,6 +321,19 @@ async def refactor_code(request: CodeRequest):
                 validation_success = True
                 new_code = candidate_code
                 logs.append("Validation: modernization passed all configured checks.")
+                
+                # Save successful transforms to knowledge base for future RAG few-shot examples
+                from core.database import save_knowledge_base_example
+                for plan in selected_plans:
+                    suggestion = plan.get("suggestion", {})
+                    pattern_id = suggestion.get("id")
+                    before_code = suggestion.get("before", "")
+                    if pattern_id and before_code:
+                        try:
+                            after_code = executor.apply_changes(before_code, [plan])
+                            save_knowledge_base_example(pattern_id, before_code, after_code, suggestion.get("risk", "LOW"))
+                        except Exception:
+                            pass
             else:
                 rolled_back = True
                 logs.append(f"Validation failed: {validation_result.get('error')}")
@@ -313,7 +342,7 @@ async def refactor_code(request: CodeRequest):
             logs.append("Planner: no executable transformations were selected.")
 
         if reasoner.is_available():
-            ml_result = reasoner.modernize(request.code)
+            ml_result = reasoner.modernize(request.code, few_shot_examples=few_shot_examples)
             if ml_result.available and ml_result.output:
                 logs.append("ML Reasoner: generated auxiliary modernization output.")
             elif ml_result.error:
